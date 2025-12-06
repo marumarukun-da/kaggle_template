@@ -1,10 +1,10 @@
 # https://github.com/Kaggle/docker-python/releases
-FROM gcr.io/kaggle-gpu-images/python:v155
+FROM gcr.io/kaggle-gpu-images/python:v163
 
 WORKDIR /workspace
 
 # その他のライブラリ
-RUN pip install --no-cache-dir \
+RUN uv pip install --system \
     ruff \
     hydra-core \
     python-dotenv \
