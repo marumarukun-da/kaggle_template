@@ -15,14 +15,14 @@ pip install cookiecutter
 1. project root directory ごと作成する場合
 
     ```bash
-    cookiecutter https://github.com/marumarukun/kaggle_template.git
+    cookiecutter https://github.com/marumarukun-da/kaggle_template.git
     ```
 
 2. 作成済みの project root directory を使いたい場合 (clone した repository など)
 
     ```bash
     cd {project_dir}
-    cookiecutter https://github.com/marumarukun/kaggle_template.git -f -o ../
+    cookiecutter https://github.com/marumarukun-da/kaggle_template.git -f -o ../
     ```
 
     - `project_slug` と `{projet_dir}` が同じ名前であり、それを上書きする形で template を作成する
