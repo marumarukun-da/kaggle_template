@@ -35,3 +35,18 @@ pip install cookiecutter
 - `project_slug`: 作成されるディレクトリ名
 - `project_description`: プロジェクトの説明
 - `kaggle_username`: kaggle に登録してあるユーザー名
+
+**入力例**
+
+例えば、[Titanic - Machine Learning from Disaster](https://www.kaggle.com/competitions/titanic) コンペに参加する場合:
+
+```
+competition_name []: titanic
+project_name [project_name]: Titanic Survival Prediction
+project_slug [titanic_survival_prediction]: titanic
+project_description []: Kaggle Titanic competition - predict survival on the Titanic
+kaggle_username []: your_kaggle_username
+```
+
+- `competition_name` はコンペURLの `https://www.kaggle.com/competitions/titanic` の末尾部分 `titanic` を入力
+- `project_slug` は作成されるディレクトリ名になるので、シンプルな名前がおすすめ
