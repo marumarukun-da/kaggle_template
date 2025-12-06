@@ -1,0 +1,21 @@
+{
+  "id": "{{ cookiecutter.kaggle_username }}/{{ cookiecutter.competition_name }}-sub",
+  "title": "{{ cookiecutter.competition_name }}-sub",
+  "code_file": "code.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": "true",
+  "enable_gpu": "false",
+  "enable_tpu": "false",
+  "enable_internet": "false",
+  "dataset_sources": [
+    "{{ cookiecutter.kaggle_username }}/{{ cookiecutter.competition_name }}-codes"
+  ],
+  "competition_sources": ["{{ cookiecutter.competition_name }}"],
+  "kernel_sources": [
+    "{{ cookiecutter.kaggle_username }}/{{ cookiecutter.competition_name }}-deps"
+  ],
+  "model_sources": [
+    "{{ cookiecutter.kaggle_username }}/{{ cookiecutter.competition_name }}-artifacts/other/001/1"
+  ]
+}
