@@ -12,12 +12,8 @@
         "shardulm94.trailing-spaces",
         "hoovercj.vscode-power-mode",
         "charliermarsh.ruff",
-        "eamodio.gitlens",
         "mhutchie.git-graph",
-        "ms-python.mypy-type-checker",
-        "Gruntfuggly.todo-tree",
         "mutantdino.resourcemonitor",
         "tamasfe.even-better-toml",
-        "openai.chatgpt"
     ]
 }
