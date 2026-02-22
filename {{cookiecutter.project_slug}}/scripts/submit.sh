@@ -18,7 +18,7 @@ set -e
 # 1. Validate submission setup
 # 2. Upload codes as Dataset
 # 3. Upload artifacts as Model
-# 4. Update sub/kernel-metadata.json
+# 4. Check sub/kernel-metadata.json and sub/code.ipynb
 # 5. Push submission kernel
 # =============================================================================
 
@@ -177,46 +177,44 @@ else
 fi
 
 # =============================================================================
-# Step 4: Update sub/kernel-metadata.json and sub/code.ipynb
+# Step 4: Check sub/kernel-metadata.json and sub/code.ipynb
 # =============================================================================
 echo ""
-echo -e "${BLUE}Step 4/5: Updating sub/kernel-metadata.json and sub/code.ipynb${NC}"
+echo -e "${BLUE}Step 4/5: Checking sub/kernel-metadata.json and sub/code.ipynb${NC}"
 echo "----------------------------------------"
 
-# --- 4a: Update model_sources experiment name in kernel-metadata.json ---
+STEP4_OK=true
+
+# --- 4a: Check model_sources references the correct experiment ---
 if grep -q "artifacts/other/$EXP_NAME/" "sub/kernel-metadata.json"; then
-    echo -e "${GREEN}sub/kernel-metadata.json already references experiment $EXP_NAME${NC}"
+    echo -e "${GREEN}[OK] sub/kernel-metadata.json references experiment $EXP_NAME${NC}"
 else
     CURRENT_MODEL_SRC=$(grep 'artifacts/other/' sub/kernel-metadata.json | head -1 | sed 's/^[[:space:]]*//')
-    echo "Updating sub/kernel-metadata.json model_sources..."
-    echo "  Before: $CURRENT_MODEL_SRC"
-
-    if [ "$DRY_RUN" = true ]; then
-        echo "[DRY RUN] Would update model_sources to reference experiment $EXP_NAME"
-    else
-        sed -i '' -e "s|artifacts/other/[^/]*/|artifacts/other/$EXP_NAME/|g" sub/kernel-metadata.json
-        UPDATED_MODEL_SRC=$(grep 'artifacts/other/' sub/kernel-metadata.json | head -1 | sed 's/^[[:space:]]*//')
-        echo "  After:  $UPDATED_MODEL_SRC"
-        echo -e "${GREEN}sub/kernel-metadata.json updated.${NC}"
-    fi
+    echo -e "${RED}[NG] sub/kernel-metadata.json does not reference experiment $EXP_NAME${NC}"
+    echo "  Current: $CURRENT_MODEL_SRC"
+    echo "  Expected: ...artifacts/other/$EXP_NAME/{version}"
+    echo ""
+    echo "  Fix: Edit sub/kernel-metadata.json and update model_sources"
+    STEP4_OK=false
 fi
 
-# --- 4b: Update inference.py path in sub/code.ipynb ---
+# --- 4b: Check inference.py path in sub/code.ipynb ---
 if grep -q "experiments/$EXP_NAME/inference.py" "sub/code.ipynb"; then
-    echo -e "${GREEN}sub/code.ipynb already references experiments/$EXP_NAME/inference.py${NC}"
+    echo -e "${GREEN}[OK] sub/code.ipynb references experiments/$EXP_NAME/inference.py${NC}"
 else
     CURRENT_INF=$(grep -o 'experiments/[^/]*/inference.py' sub/code.ipynb | head -1)
-    echo "Updating sub/code.ipynb inference path..."
-    echo "  Before: $CURRENT_INF"
+    echo -e "${RED}[NG] sub/code.ipynb does not reference experiment $EXP_NAME${NC}"
+    echo "  Current: $CURRENT_INF"
+    echo "  Expected: experiments/$EXP_NAME/inference.py"
+    echo ""
+    echo "  Fix: Edit sub/code.ipynb and update the inference.py path"
+    STEP4_OK=false
+fi
 
-    if [ "$DRY_RUN" = true ]; then
-        echo "[DRY RUN] Would update inference path to experiments/$EXP_NAME/inference.py"
-    else
-        sed -i '' -e "s|experiments/[^/]*/inference.py|experiments/$EXP_NAME/inference.py|g" sub/code.ipynb
-        UPDATED_INF=$(grep -o 'experiments/[^/]*/inference.py' sub/code.ipynb | head -1)
-        echo "  After:  $UPDATED_INF"
-        echo -e "${GREEN}sub/code.ipynb updated.${NC}"
-    fi
+if [ "$STEP4_OK" = false ]; then
+    echo ""
+    echo -e "${RED}Submission settings mismatch. Please fix the above issues and re-run.${NC}"
+    exit 1
 fi
 
 # =============================================================================

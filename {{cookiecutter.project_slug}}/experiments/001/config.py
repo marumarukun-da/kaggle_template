@@ -67,7 +67,7 @@ else:
     INPUT_DIR = Path("/kaggle/input")
     ARTIFACT_DIR = INPUT_DIR / f"{KAGGLE_COMPETITION_NAME}-artifacts".lower() / "other"
     OUTPUT_DIR = ROOT_DIR  # Kaggle環境では /kaggle/working に出力
-    VERSION = "1"  # Kaggle環境ではバージョン管理不要
+    VERSION = os.getenv("EXP_VERSION", "1")
 
 COMP_DATASET_DIR = INPUT_DIR / KAGGLE_COMPETITION_NAME
 
@@ -75,7 +75,7 @@ for d in [INPUT_DIR, OUTPUT_DIR]:
     d.mkdir(exist_ok=True, parents=True)
 
 
-def ARTIFACT_EXP_DIR(exp_name: str, version: str = "1") -> Path:
+def ARTIFACT_EXP_DIR(exp_name: str, version: str = VERSION) -> Path:
     """対象の実験の artifact が格納されている場所を返す。"""
     return ARTIFACT_DIR / exp_name / version
 

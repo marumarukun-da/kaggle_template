@@ -188,8 +188,10 @@ def model_upload(
     is_exist_model_instance = check_if_exist_model_instance(handle=handle)
 
     if is_exist_model_instance and not update:
-        logger.warning(f"{handle} already exist!! Stop pushing. 🛑")
-        return
+        raise RuntimeError(
+            f"Model instance '{handle}' already exists. "
+            f"Use --update True to create a new version, or delete the existing instance on Kaggle."
+        )
 
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = Path(tempdir)
@@ -314,7 +316,7 @@ def competition_download(
             quiet=False,
             force=force_download,
         )
-        subprocess.run(["unzip", "-o", "-q", zipfile_path, "-d", out_dir])
+        subprocess.run(["unzip", "-o", "-q", str(zipfile_path), "-d", str(out_dir)])
     else:
         logger.info(f"Dataset ({handle}) already exists.")
 
@@ -348,6 +350,6 @@ def datasets_download(
                 force=force_download,
             )
 
-            subprocess.run(["unzip", "-o", "-q", zipfile_path, "-d", out_dir])
+            subprocess.run(["unzip", "-o", "-q", str(zipfile_path), "-d", str(out_dir)])
         else:
             logger.info(f"Dataset ({dataset}) already exists.")

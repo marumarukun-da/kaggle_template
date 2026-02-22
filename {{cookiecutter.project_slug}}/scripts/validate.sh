@@ -18,16 +18,17 @@ NC='\033[0m' # No Color
 EXP_NAME=""
 SKIP_INFERENCE=false
 
-for arg in "$@"; do
-    case $arg in
+while [ $# -gt 0 ]; do
+    case $1 in
         --skip-inference)
             SKIP_INFERENCE=true
             shift
             ;;
         *)
             if [ -z "$EXP_NAME" ]; then
-                EXP_NAME="$arg"
+                EXP_NAME="$1"
             fi
+            shift
             ;;
     esac
 done
