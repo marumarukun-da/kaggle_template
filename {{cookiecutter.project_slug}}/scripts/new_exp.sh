@@ -32,7 +32,7 @@ BASE_EXP=""
 EXP_NAME=""
 
 # Parse arguments
-while [[ $# -gt 0 ]]; do
+while [ $# -gt 0 ]; do
     case $1 in
         --template)
             TEMPLATE="$2"
@@ -104,8 +104,8 @@ if [ -z "$EXP_NAME" ]; then
     for dir in experiments/*/; do
         dir_name=$(basename "$dir")
         # Check if directory name is a number
-        if [[ "$dir_name" =~ ^[0-9]+$ ]]; then
-            num=$((10#$dir_name))  # Convert to decimal
+        if echo "$dir_name" | grep -qE '^[0-9]+$'; then
+            num=$(echo "$dir_name" | sed 's/^0*//' | grep . || echo 0)  # Convert to decimal
             if [ "$num" -gt "$LAST_NUM" ]; then
                 LAST_NUM=$num
             fi
