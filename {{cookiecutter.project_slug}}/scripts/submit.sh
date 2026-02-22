@@ -7,10 +7,12 @@ set -e
 # Usage: sh scripts/submit.sh <experiment_name> [options]
 #
 # Options:
+#   --version VER   Specify artifact version to upload (default: latest)
 #   --dry-run       Show what would be done without actually pushing
 #   --skip-validate Skip validation step
 #   --skip-codes    Skip codes dataset upload
 #   --skip-artifacts Skip artifacts model upload
+#   --update        Update existing model instance instead of creating new
 #
 # This script handles the entire submission flow:
 # 1. Validate submission setup
@@ -28,13 +30,19 @@ NC='\033[0m' # No Color
 
 # Parse arguments
 EXP_NAME=""
+VERSION="latest"
 DRY_RUN=false
 SKIP_VALIDATE=false
 SKIP_CODES=false
 SKIP_ARTIFACTS=false
+UPDATE_MODEL=false
 
-for arg in "$@"; do
-    case $arg in
+while [ $# -gt 0 ]; do
+    case $1 in
+        --version)
+            VERSION="$2"
+            shift 2
+            ;;
         --dry-run)
             DRY_RUN=true
             shift
@@ -51,10 +59,15 @@ for arg in "$@"; do
             SKIP_ARTIFACTS=true
             shift
             ;;
+        --update)
+            UPDATE_MODEL=true
+            shift
+            ;;
         *)
             if [ -z "$EXP_NAME" ]; then
-                EXP_NAME="$arg"
+                EXP_NAME="$1"
             fi
+            shift
             ;;
     esac
 done
@@ -65,10 +78,12 @@ if [ -z "$EXP_NAME" ]; then
     echo "Usage: sh scripts/submit.sh <experiment_name> [options]"
     echo ""
     echo "Options:"
+    echo "  --version VER   Specify artifact version to upload (default: latest)"
     echo "  --dry-run       Show what would be done without actually pushing"
     echo "  --skip-validate Skip validation step"
     echo "  --skip-codes    Skip codes dataset upload"
     echo "  --skip-artifacts Skip artifacts model upload"
+    echo "  --update        Update existing model instance"
     exit 1
 fi
 
@@ -77,8 +92,12 @@ echo ""
 echo "========================================"
 echo -e "${BLUE}Kaggle Submission${NC}"
 echo "Experiment: $EXP_NAME"
+echo "Version: $VERSION"
 if [ "$DRY_RUN" = true ]; then
     echo -e "${YELLOW}[DRY RUN MODE]${NC}"
+fi
+if [ "$UPDATE_MODEL" = true ]; then
+    echo -e "${YELLOW}[UPDATE MODE]${NC}"
 fi
 echo "========================================"
 
@@ -136,11 +155,16 @@ if [ "$SKIP_ARTIFACTS" = false ]; then
     echo -e "${BLUE}Step 3/5: Uploading artifacts model${NC}"
     echo "----------------------------------------"
 
+    UPDATE_FLAG=""
+    if [ "$UPDATE_MODEL" = true ]; then
+        UPDATE_FLAG="--update True"
+    fi
+
     if [ "$DRY_RUN" = true ]; then
-        echo "[DRY RUN] Would run: python src/upload.py artifacts --exp_name $EXP_NAME"
+        echo "[DRY RUN] Would run: python src/upload.py artifacts --exp_name $EXP_NAME --version $VERSION $UPDATE_FLAG"
     else
-        echo "Uploading artifacts for experiment: $EXP_NAME"
-        python src/upload.py artifacts --exp_name "$EXP_NAME"
+        echo "Uploading artifacts for experiment: $EXP_NAME (version: $VERSION)"
+        python src/upload.py artifacts --exp_name "$EXP_NAME" --version "$VERSION" $UPDATE_FLAG
         if [ $? -ne 0 ]; then
             echo -e "${RED}Artifacts upload failed. Aborting submission.${NC}"
             exit 1

@@ -98,6 +98,37 @@ sh scripts/new_exp.sh --template image   # 画像系テンプレート
 
 `experiments/001/code.ipynb` を編集・実行してモデルを学習します。
 
+#### バージョン管理について
+
+同じ実験でパラメータを変えて複数回学習する場合、`EXP_VERSION` 環境変数でバージョンを管理できます。
+
+```bash
+# デフォルト: バージョン 1 に出力
+# data/output/001/1/ に保存される
+
+# バージョン 2 に出力
+EXP_VERSION=2 python -c "import config; print(config.OUTPUT_DIR)"
+# → data/output/001/2/
+
+# 次のバージョンを自動生成（既存の最大値 + 1）
+EXP_VERSION=next python -c "import config; print(config.OUTPUT_DIR)"
+# → data/output/001/3/ （001/1, 001/2 が存在する場合）
+
+# 最新の既存バージョンを使用（推論時などに便利）
+EXP_VERSION=latest python -c "import config; print(config.OUTPUT_DIR)"
+# → data/output/001/2/ （001/1, 001/2 が存在する場合）
+```
+
+Jupyter Notebook で使用する場合は、セルの先頭で環境変数を設定します：
+
+```python
+import os
+os.environ["EXP_VERSION"] = "2"  # config をインポートする前に設定
+
+import config
+print(config.OUTPUT_DIR)  # data/output/001/2/
+```
+
 <details>
 <summary>学習コードの例（code.ipynb）</summary>
 
@@ -235,14 +266,60 @@ sh scripts/status.sh
 <summary>手動で個別に実行する場合</summary>
 
 ```bash
-# コード・モデルをアップロード
-sh scripts/push_experiment.sh 001
+# コード・モデルをアップロード（最新バージョンを自動検出）
+python src/upload.py artifacts --exp_name 001
+
+# 特定のバージョンをアップロード
+python src/upload.py artifacts --exp_name 001 --version 2
+
+# 既存の Model Instance を更新する場合
+python src/upload.py artifacts --exp_name 001 --update True
+
+# コードをアップロード
+python src/upload.py codes
 
 # 提出Kernelをpush
 sh scripts/push_sub.sh
 ```
 
 </details>
+
+#### 提出前チェックリスト
+
+提出前に以下を確認してください：
+
+- [ ] `experiments/{exp}/code.ipynb` を実行してモデルを保存した
+- [ ] `data/output/{exp}/{version}/` にモデルファイルが存在する
+- [ ] `experiments/{exp}/inference.py` が正しいモデルパスを参照している
+- [ ] `sub/code.ipynb` の inference.py パスが正しい実験番号を指している
+- [ ] `sub/kernel-metadata.json` の `model_sources` が正しいバージョンを指している
+
+#### model_sources のバージョン指定について
+
+**重要**: `kernel-metadata.json` の `model_sources` は **Kaggle上の Model Instance バージョン** を指定します。
+
+```json
+{
+  "model_sources": [
+    "username/comp-artifacts/other/001/1"
+  ]                                   ^^^
+                                      Kaggleバージョン番号
+}
+```
+
+**注意**: ローカルのバージョン番号と Kaggle のバージョン番号は**別物**です。
+
+- ローカル: `data/output/001/2/` の `2` はローカルでの管理用
+- Kaggle: Model Instance のバージョンは**アップロード順**に自動採番される
+
+```
+# 例: 同じ実験で3回アップロードした場合
+ローカル 001/1/ → アップロード → Kaggle version 1 → model_sources: /001/1
+ローカル 001/2/ → アップロード → Kaggle version 2 → model_sources: /001/2
+ローカル 001/1/ を修正 → アップロード(--update) → Kaggle version 3 → model_sources: /001/3
+```
+
+Kaggle上の最新バージョン番号は、アップロード時のログまたは Kaggle Web で確認してください。
 
 ---
 
@@ -266,10 +343,18 @@ sh scripts/push_sub.sh
 sh scripts/submit.sh <experiment_name> [options]
 
 Options:
+  --version VER    アップロードするバージョンを指定（デフォルト: latest）
   --dry-run        実際にpushせずに何が起こるか確認
   --skip-validate  検証をスキップ
   --skip-codes     コードDatasetのアップロードをスキップ
   --skip-artifacts モデルアップロードをスキップ
+  --update         既存のModel Instanceを更新する
+
+# 使用例
+sh scripts/submit.sh 001                      # 最新バージョンを提出
+sh scripts/submit.sh 001 --version 2          # バージョン2を提出
+sh scripts/submit.sh 001 --update             # 既存のModelを更新
+sh scripts/submit.sh 001 --dry-run            # 確認のみ（実行しない）
 ```
 
 </details>
@@ -402,6 +487,53 @@ cp experiments/templates/tabular/* experiments/001/
 1. アップロード時のエラーメッセージを確認
 2. Kaggle Web の "Your Work" → "Datasets" / "Models" で確認
 3. 初回アップロード後、反映に数分かかることがある
+
+---
+
+### Dataset のバージョンが更新されない
+
+**原因**: Kaggle API はファイルに変更がないとバージョンを作成しない仕様
+
+**対処法**:
+- 本テンプレートでは、`dataset_upload` 実行時にタイムスタンプファイルを自動追加して
+  バージョン更新を強制するようになっています
+- それでも更新されない場合は、Kaggle Web から手動で新しいバージョンを作成してください
+
+---
+
+### 複数バージョンのモデルをアップロードしたい
+
+**対処法**:
+```bash
+# バージョン 1 をアップロード（初回）
+EXP_VERSION=1 python src/upload.py artifacts --exp_name 001
+
+# バージョン 2 をアップロード
+EXP_VERSION=2 python src/upload.py artifacts --exp_name 001 --version 2
+
+# 既存バージョンを更新する場合は --update を使用
+python src/upload.py artifacts --exp_name 001 --version 1 --update True
+```
+
+**注意**: Kaggle の Model Instance は `{username}/{comp}-artifacts/other/{exp_name}` という
+単一のパスを持ちます。バージョンは Kaggle 側で管理されます。
+
+---
+
+### ARTIFACT_EXP_DIR でバージョンを指定したい
+
+**対処法**:
+```python
+import config
+
+# バージョン 1 のモデル（デフォルト）
+model_dir = config.ARTIFACT_EXP_DIR("001")
+# → data/output/001/1/
+
+# バージョン 2 のモデル
+model_dir = config.ARTIFACT_EXP_DIR("001", version="2")
+# → data/output/001/2/
+```
 
 </details>
 

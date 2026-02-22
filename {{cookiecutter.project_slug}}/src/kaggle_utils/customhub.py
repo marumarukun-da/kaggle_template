@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+from datetime import datetime
 from fnmatch import fnmatch
 from pathlib import Path
 
@@ -229,7 +230,12 @@ def dataset_upload(
     ignore_patterns: list[str] = IGNORE_PATTERNS,
     update: bool = False,
 ) -> None:
-    """Push output directory to kaggle dataset."""
+    """Push output directory to kaggle dataset.
+
+    Note:
+        update=True の場合、タイムスタンプファイルを追加してバージョン更新を強制します。
+        Kaggle API は変更がないとバージョンを作成しないため、この対策が必要です。
+    """
 
     # model and predictions
     metadata = make_dataset_metadata(handle=handle)
@@ -257,10 +263,18 @@ def dataset_upload(
             json.dump(metadata, f, indent=4)
 
         if check_if_exist_dataset(handle=handle) and update:
-            logger.info(f"update {handle}")
+            # タイムスタンプファイルを追加して変更を強制
+            # Kaggle API は変更がないとバージョンを作成しないため
+            timestamp_file = dst_dir / ".upload_timestamp"
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            timestamp_file.write_text(timestamp)
+
+            version_notes = f"Updated at {timestamp}"
+            logger.info(f"update {handle} ({version_notes})")
+
             kaggle_client.dataset_create_version(
                 folder=dst_dir,
-                version_notes="latest",
+                version_notes=version_notes,
                 quiet=False,
                 convert_to_csv=False,
                 delete_old_versions=False,
