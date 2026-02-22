@@ -78,3 +78,32 @@ for d in [INPUT_DIR, OUTPUT_DIR]:
 def ARTIFACT_EXP_DIR(exp_name: str, version: str = "1") -> Path:
     """対象の実験の artifact が格納されている場所を返す。"""
     return ARTIFACT_DIR / exp_name / version
+
+
+# ---------- # TABULAR CONFIG # ---------- #
+class CFG:
+    # General
+    SEED = 42
+    N_FOLDS = 5
+    TARGET_COL = "target"  # Update with your target column
+
+    # Paths
+    DATA_PATH = COMP_DATASET_DIR
+    OUTPUT_PATH = OUTPUT_DIR
+    MODEL_PATH = OUTPUT_DIR / "models"
+
+    # LightGBM parameters
+    lgb_params = {
+        "objective": "regression",  # or "binary", "multiclass"
+        "metric": "rmse",
+        "learning_rate": 0.05,
+        "max_depth": 6,
+        "num_leaves": 31,
+        "colsample_bytree": 0.8,
+        "subsample": 0.8,
+        "seed": SEED,
+        "verbosity": -1,
+    }
+
+    NUM_BOOST_ROUND = 10000
+    EARLY_STOPPING_ROUND = 100

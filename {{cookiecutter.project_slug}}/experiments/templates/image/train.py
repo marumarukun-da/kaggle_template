@@ -1,271 +1,198 @@
-"""Training utilities for image classification."""
+"""Main training script for image classification."""
 
+import argparse
 import gc
-import time
+import os
+import random
+import warnings
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import torch
-import torch.nn as nn
-from torch.cuda.amp import GradScaler, autocast
-from torch.optim import AdamW
-from torch.optim.lr_scheduler import CosineAnnealingLR, ReduceLROnPlateau, StepLR
-from tqdm import tqdm
+from sklearn.model_selection import StratifiedKFold
+
+import config
+from augmentation import get_train_transforms, get_valid_transforms
+from dataset import create_dataloader
+from model import RECOMMENDED_MODELS, create_model
+from trainer import train_fold
+
+warnings.filterwarnings("ignore")
 
 
-class AverageMeter:
-    """Computes and stores the average and current value."""
-
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
+# =============================================================================
+# Seed Everything
+# =============================================================================
+def seed_everything(seed: int):
+    random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
-def get_optimizer(model: nn.Module, lr: float, weight_decay: float) -> torch.optim.Optimizer:
-    """Get optimizer with weight decay.
+def main():
+    parser = argparse.ArgumentParser(description="Image classification training")
+    parser.add_argument("--fold", type=int, default=None, help="Run a specific fold only (1-indexed)")
+    parser.add_argument("--debug", action="store_true", help="Debug mode (fewer epochs)")
+    args = parser.parse_args()
 
-    Args:
-        model: Model to optimize
-        lr: Learning rate
-        weight_decay: Weight decay
+    # =============================================================================
+    # Configuration (override from config.py if needed)
+    # =============================================================================
+    CFG = config.CFG
 
-    Returns:
-        Optimizer instance
-    """
-    # Don't apply weight decay to bias and LayerNorm
-    no_decay = ["bias", "LayerNorm.weight", "LayerNorm.bias"]
-    optimizer_grouped_parameters = [
-        {
-            "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
-            "weight_decay": weight_decay,
-        },
-        {
-            "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
-            "weight_decay": 0.0,
-        },
-    ]
-    return AdamW(optimizer_grouped_parameters, lr=lr)
+    if args.debug:
+        CFG.EPOCHS = 1
 
+    print(f"Model: {CFG.MODEL_NAME}")
+    print(f"Image Size: {CFG.IMG_SIZE}")
+    print(f"Batch Size: {CFG.BATCH_SIZE}")
+    print(f"Epochs: {CFG.EPOCHS}")
+    print(f"Learning Rate: {CFG.LEARNING_RATE}")
 
-def get_scheduler(
-    optimizer: torch.optim.Optimizer,
-    scheduler_type: str,
-    epochs: int,
-    steps_per_epoch: int = None,
-) -> torch.optim.lr_scheduler._LRScheduler:
-    """Get learning rate scheduler.
+    seed_everything(CFG.SEED)
 
-    Args:
-        optimizer: Optimizer instance
-        scheduler_type: Type of scheduler (cosine, step, plateau)
-        epochs: Number of epochs
-        steps_per_epoch: Number of steps per epoch (for step scheduler)
+    # Device
+    device = CFG.DEVICE if torch.cuda.is_available() else "cpu"
+    print(f"Device: {device}")
 
-    Returns:
-        Scheduler instance
-    """
-    if scheduler_type == "cosine":
-        return CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-7)
-    elif scheduler_type == "step":
-        return StepLR(optimizer, step_size=epochs // 3, gamma=0.1)
-    elif scheduler_type == "plateau":
-        return ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=3, verbose=True)
-    else:
-        raise ValueError(f"Unknown scheduler type: {scheduler_type}")
+    # Create output directory
+    CFG.MODEL_PATH.mkdir(parents=True, exist_ok=True)
 
+    # =============================================================================
+    # Load Data
+    # =============================================================================
+    # TODO: Update with your data loading logic
+    train_df = pd.read_csv(CFG.DATA_PATH / "train.csv")
 
-def train_one_epoch(
-    model: nn.Module,
-    dataloader: torch.utils.data.DataLoader,
-    criterion: nn.Module,
-    optimizer: torch.optim.Optimizer,
-    device: str,
-    use_amp: bool = True,
-    scaler: GradScaler = None,
-) -> tuple[float, float]:
-    """Train model for one epoch.
+    print(f"Train samples: {len(train_df)}")
+    print(f"Columns: {train_df.columns.tolist()}")
+    print(f"\nLabel distribution:")
+    print(train_df[CFG.TARGET_COL].value_counts())
 
-    Args:
-        model: Model to train
-        dataloader: Training dataloader
-        criterion: Loss function
-        optimizer: Optimizer
-        device: Device to use
-        use_amp: Whether to use automatic mixed precision
-        scaler: GradScaler for AMP
+    # =============================================================================
+    # Create Folds
+    # =============================================================================
+    skf = StratifiedKFold(n_splits=CFG.N_FOLDS, shuffle=True, random_state=CFG.SEED)
 
-    Returns:
-        Tuple of (average loss, accuracy)
-    """
-    model.train()
-    losses = AverageMeter()
-    correct = 0
-    total = 0
+    train_df["fold"] = -1
+    for fold, (_, val_idx) in enumerate(skf.split(train_df, train_df[CFG.TARGET_COL])):
+        train_df.loc[val_idx, "fold"] = fold
 
-    pbar = tqdm(dataloader, desc="Training")
-    for images, labels in pbar:
-        images = images.to(device)
-        labels = labels.to(device)
+    print(f"Fold distribution:")
+    print(train_df["fold"].value_counts().sort_index())
 
-        optimizer.zero_grad()
+    # =============================================================================
+    # Transforms
+    # =============================================================================
+    train_transforms = get_train_transforms(CFG.IMG_SIZE)
+    valid_transforms = get_valid_transforms(CFG.IMG_SIZE)
 
-        if use_amp:
-            with autocast():
-                outputs = model(images)
-                loss = criterion(outputs, labels)
+    print("Train transforms:")
+    print(train_transforms)
+    print("\nValid transforms:")
+    print(valid_transforms)
 
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
+    # =============================================================================
+    # Training Loop
+    # =============================================================================
+    # TODO: Update image_dir with your image directory
+    image_dir = CFG.DATA_PATH / "images" / "train"
 
-        # Update metrics
-        losses.update(loss.item(), images.size(0))
-        _, predicted = outputs.max(1)
-        total += labels.size(0)
-        correct += predicted.eq(labels).sum().item()
+    folds = [args.fold - 1] if args.fold is not None else range(CFG.N_FOLDS)
+    all_histories = []
 
-        pbar.set_postfix({"loss": f"{losses.avg:.4f}", "acc": f"{100.*correct/total:.2f}%"})
+    for fold in folds:
+        print(f"\n{'='*60}")
+        print(f"FOLD {fold + 1}/{CFG.N_FOLDS}")
+        print(f"{'='*60}")
 
-    accuracy = 100.0 * correct / total
-    return losses.avg, accuracy
+        # Split data
+        train_fold_df = train_df[train_df["fold"] != fold].reset_index(drop=True)
+        valid_fold_df = train_df[train_df["fold"] == fold].reset_index(drop=True)
 
+        print(f"Train samples: {len(train_fold_df)}")
+        print(f"Valid samples: {len(valid_fold_df)}")
 
-@torch.no_grad()
-def validate(
-    model: nn.Module,
-    dataloader: torch.utils.data.DataLoader,
-    criterion: nn.Module,
-    device: str,
-    use_amp: bool = True,
-) -> tuple[float, float]:
-    """Validate model.
-
-    Args:
-        model: Model to validate
-        dataloader: Validation dataloader
-        criterion: Loss function
-        device: Device to use
-        use_amp: Whether to use automatic mixed precision
-
-    Returns:
-        Tuple of (average loss, accuracy)
-    """
-    model.eval()
-    losses = AverageMeter()
-    correct = 0
-    total = 0
-
-    pbar = tqdm(dataloader, desc="Validation")
-    for images, labels in pbar:
-        images = images.to(device)
-        labels = labels.to(device)
-
-        if use_amp:
-            with autocast():
-                outputs = model(images)
-                loss = criterion(outputs, labels)
-        else:
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-
-        losses.update(loss.item(), images.size(0))
-        _, predicted = outputs.max(1)
-        total += labels.size(0)
-        correct += predicted.eq(labels).sum().item()
-
-        pbar.set_postfix({"loss": f"{losses.avg:.4f}", "acc": f"{100.*correct/total:.2f}%"})
-
-    accuracy = 100.0 * correct / total
-    return losses.avg, accuracy
-
-
-def train_fold(
-    model: nn.Module,
-    train_loader: torch.utils.data.DataLoader,
-    valid_loader: torch.utils.data.DataLoader,
-    epochs: int,
-    lr: float,
-    weight_decay: float,
-    scheduler_type: str,
-    device: str,
-    use_amp: bool,
-    save_path: Path,
-    fold: int,
-) -> dict:
-    """Train model for one fold.
-
-    Args:
-        model: Model to train
-        train_loader: Training dataloader
-        valid_loader: Validation dataloader
-        epochs: Number of epochs
-        lr: Learning rate
-        weight_decay: Weight decay
-        scheduler_type: Type of scheduler
-        device: Device to use
-        use_amp: Whether to use AMP
-        save_path: Path to save model
-        fold: Fold number
-
-    Returns:
-        Dictionary with training history
-    """
-    criterion = nn.CrossEntropyLoss()
-    optimizer = get_optimizer(model, lr, weight_decay)
-    scheduler = get_scheduler(optimizer, scheduler_type, epochs)
-    scaler = GradScaler() if use_amp else None
-
-    best_acc = 0
-    history = {"train_loss": [], "train_acc": [], "valid_loss": [], "valid_acc": []}
-
-    for epoch in range(epochs):
-        print(f"\nEpoch {epoch + 1}/{epochs}")
-        print("-" * 30)
-
-        # Train
-        train_loss, train_acc = train_one_epoch(
-            model, train_loader, criterion, optimizer, device, use_amp, scaler
+        # Create dataloaders
+        train_loader = create_dataloader(
+            df=train_fold_df,
+            image_dir=image_dir,
+            transforms=train_transforms,
+            batch_size=CFG.BATCH_SIZE,
+            num_workers=CFG.NUM_WORKERS,
+            is_train=True,
+            label_col=CFG.TARGET_COL,
         )
 
-        # Validate
-        valid_loss, valid_acc = validate(model, valid_loader, criterion, device, use_amp)
+        valid_loader = create_dataloader(
+            df=valid_fold_df,
+            image_dir=image_dir,
+            transforms=valid_transforms,
+            batch_size=CFG.BATCH_SIZE * 2,
+            num_workers=CFG.NUM_WORKERS,
+            is_train=True,  # Need labels for validation
+            label_col=CFG.TARGET_COL,
+        )
 
-        # Update scheduler
-        if scheduler_type == "plateau":
-            scheduler.step(valid_loss)
-        else:
-            scheduler.step()
+        # Create model
+        model = create_model(
+            model_name=CFG.MODEL_NAME,
+            num_classes=CFG.NUM_CLASSES,
+            pretrained=CFG.PRETRAINED,
+            device=device,
+        )
 
-        # Save history
-        history["train_loss"].append(train_loss)
-        history["train_acc"].append(train_acc)
-        history["valid_loss"].append(valid_loss)
-        history["valid_acc"].append(valid_acc)
+        # Train
+        history = train_fold(
+            model=model,
+            train_loader=train_loader,
+            valid_loader=valid_loader,
+            epochs=CFG.EPOCHS,
+            lr=CFG.LEARNING_RATE,
+            weight_decay=CFG.WEIGHT_DECAY,
+            scheduler_type=CFG.SCHEDULER,
+            device=device,
+            use_amp=CFG.USE_AMP,
+            save_path=CFG.MODEL_PATH,
+            fold=fold + 1,
+        )
 
-        print(f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}%")
-        print(f"Valid Loss: {valid_loss:.4f} | Valid Acc: {valid_acc:.2f}%")
+        all_histories.append(history)
 
-        # Save best model
-        if valid_acc > best_acc:
-            best_acc = valid_acc
-            save_path.mkdir(parents=True, exist_ok=True)
-            torch.save(model.state_dict(), save_path / f"model_fold{fold}.pth")
-            print(f"Saved best model with accuracy: {best_acc:.2f}%")
+        # Cleanup
+        del model, train_loader, valid_loader
+        gc.collect()
+        torch.cuda.empty_cache()
 
-    return history
+    # =============================================================================
+    # Training Summary
+    # =============================================================================
+    print("\n" + "=" * 60)
+    print("TRAINING SUMMARY")
+    print("=" * 60)
+
+    for i, history in enumerate(all_histories):
+        fold_num = (args.fold if args.fold is not None else i + 1)
+        best_epoch = np.argmax(history["valid_acc"])
+        best_acc = history["valid_acc"][best_epoch]
+        print(f"Fold {fold_num}: Best Acc = {best_acc:.2f}% (Epoch {best_epoch + 1})")
+
+    # Average best accuracy
+    avg_acc = np.mean([max(h["valid_acc"]) for h in all_histories])
+    print(f"\nAverage Best Accuracy: {avg_acc:.2f}%")
+
+    # =============================================================================
+    # Available Models (for reference)
+    # =============================================================================
+    print("\nRecommended models for Kaggle competitions:")
+    for model_name in RECOMMENDED_MODELS:
+        print(f"  - {model_name}")
+
+
+if __name__ == "__main__":
+    main()
