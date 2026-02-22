@@ -241,17 +241,51 @@ sh scripts/push_deps.sh
 
 ### Step 5: 提出設定を確認
 
-`sub/code.ipynb` と `sub/kernel-metadata.json` を確認・編集します。
+`sub/kernel-metadata.json` と `sub/code.ipynb` は提出Kernelの設定ファイルです。
+
+> **Note**: `submit.sh <実験番号>` を実行すると、`model_sources` と `code.ipynb` の inference パスが**指定した実験番号に合わせて自動的に書き換わります**。
+> 手動編集が必要なのは GPU/TPU 設定の変更時のみです。
+
+<details>
+<summary>kernel-metadata.json のフィールド説明</summary>
+
+| フィールド | 説明 | 変更タイミング |
+|-----------|------|---------------|
+| `id` | Kaggle上のKernel識別子 (`username/comp-sub`) | 変更不要（自動生成） |
+| `title` | Kaggle上での表示名 | 変更不要（自動生成） |
+| `code_file` | 実行するノートブックファイル名 | 変更不要 |
+| `language` | 実行言語 (`python`) | 変更不要 |
+| `kernel_type` | `notebook` or `script` | 変更不要 |
+| `is_private` | `"true"` = 非公開 | 公開したい場合に `"false"` |
+| `enable_gpu` | `"true"` でGPU有効 | **GPU推論が必要な場合**に `"true"` に変更 |
+| `enable_tpu` | `"true"` でTPU有効 | **TPU推論が必要な場合**に `"true"` に変更 |
+| `enable_internet` | `"true"` でインターネット有効 | 通常は `"false"`（コンペ規約に依存） |
+| `dataset_sources` | コードDataset (`username/comp-codes`) | 変更不要 |
+| `competition_sources` | コンペティションデータへのアクセス | 変更不要 |
+| `kernel_sources` | 依存パッケージKernel (`username/comp-deps`) | 変更不要 |
+| `model_sources` | 学習済みモデル (`username/comp-artifacts/other/実験名/ver`) | **submit.shが引数に応じて更新** |
+
+**Kaggleリソースとの対応関係:**
+```
+kernel-metadata.json          →  Kaggle上のリソース
+─────────────────────────────────────────────────────
+competition_sources           →  コンペデータ (/kaggle/input/{comp}/)
+dataset_sources (comp-codes)  →  実験コード (/kaggle/input/{comp}-codes/)
+kernel_sources (comp-deps)    →  依存パッケージ (/kaggle/input/{comp}-deps/)
+model_sources (comp-artifacts)→  学習済みモデル (/kaggle/input/{comp}-artifacts/)
+```
+
+</details>
 
 <details>
 <summary>sub/code.ipynb の確認ポイント</summary>
 
 ```python
-# inference.py のパスが正しいか確認
+# inference.py のパス（submit.sh が指定した実験番号に書き換え）
 !PYTHONPATH=/kaggle/input/{{ cookiecutter.competition_name }}-codes \
   python /kaggle/input/{{ cookiecutter.competition_name }}-codes/experiments/001/inference.py
 #                                                                          ^^^
-#                                                            実験番号を確認
+#                                                            実験番号（submit.shが書き換え）
 ```
 
 </details>
@@ -263,8 +297,13 @@ sh scripts/push_deps.sh
 {
   "model_sources": [
     "{{ cookiecutter.kaggle_username }}/{{ cookiecutter.competition_name }}-artifacts/other/001/1"
-  ]  // ← 実験番号が正しいか確認
+  ]
 }
+```
+```
+                                                                          ^^^ ^
+                                                          実験番号(submit.shが書き換え) │
+                                                              Kaggleバージョン番号
 ```
 
 </details>

@@ -177,29 +177,46 @@ else
 fi
 
 # =============================================================================
-# Step 4: Update sub/kernel-metadata.json
+# Step 4: Update sub/kernel-metadata.json and sub/code.ipynb
 # =============================================================================
 echo ""
-echo -e "${BLUE}Step 4/5: Checking sub/kernel-metadata.json${NC}"
+echo -e "${BLUE}Step 4/5: Updating sub/kernel-metadata.json and sub/code.ipynb${NC}"
 echo "----------------------------------------"
 
-# Check if model_sources needs updating
-if grep -q "/$EXP_NAME/1" "sub/kernel-metadata.json"; then
+# --- 4a: Update model_sources experiment name in kernel-metadata.json ---
+if grep -q "artifacts/other/$EXP_NAME/" "sub/kernel-metadata.json"; then
     echo -e "${GREEN}sub/kernel-metadata.json already references experiment $EXP_NAME${NC}"
 else
-    echo -e "${YELLOW}Note: sub/kernel-metadata.json may need to be updated to reference $EXP_NAME${NC}"
-    echo "Current model_sources:"
-    grep -A5 '"model_sources"' sub/kernel-metadata.json || echo "  (not found)"
-    echo ""
-    echo "Expected pattern: .../$EXP_NAME/1"
+    CURRENT_MODEL_SRC=$(grep 'artifacts/other/' sub/kernel-metadata.json | head -1 | sed 's/^[[:space:]]*//')
+    echo "Updating sub/kernel-metadata.json model_sources..."
+    echo "  Before: $CURRENT_MODEL_SRC"
+
+    if [ "$DRY_RUN" = true ]; then
+        echo "[DRY RUN] Would update model_sources to reference experiment $EXP_NAME"
+    else
+        sed -i '' -e "s|artifacts/other/[^/]*/|artifacts/other/$EXP_NAME/|g" sub/kernel-metadata.json
+        UPDATED_MODEL_SRC=$(grep 'artifacts/other/' sub/kernel-metadata.json | head -1 | sed 's/^[[:space:]]*//')
+        echo "  After:  $UPDATED_MODEL_SRC"
+        echo -e "${GREEN}sub/kernel-metadata.json updated.${NC}"
+    fi
 fi
 
-# Check if inference path in sub/code.ipynb is correct
+# --- 4b: Update inference.py path in sub/code.ipynb ---
 if grep -q "experiments/$EXP_NAME/inference.py" "sub/code.ipynb"; then
-    echo -e "${GREEN}sub/code.ipynb references correct inference.py${NC}"
+    echo -e "${GREEN}sub/code.ipynb already references experiments/$EXP_NAME/inference.py${NC}"
 else
-    echo -e "${YELLOW}Warning: sub/code.ipynb may need to be updated${NC}"
-    echo "Expected: experiments/$EXP_NAME/inference.py"
+    CURRENT_INF=$(grep -o 'experiments/[^/]*/inference.py' sub/code.ipynb | head -1)
+    echo "Updating sub/code.ipynb inference path..."
+    echo "  Before: $CURRENT_INF"
+
+    if [ "$DRY_RUN" = true ]; then
+        echo "[DRY RUN] Would update inference path to experiments/$EXP_NAME/inference.py"
+    else
+        sed -i '' -e "s|experiments/[^/]*/inference.py|experiments/$EXP_NAME/inference.py|g" sub/code.ipynb
+        UPDATED_INF=$(grep -o 'experiments/[^/]*/inference.py' sub/code.ipynb | head -1)
+        echo "  After:  $UPDATED_INF"
+        echo -e "${GREEN}sub/code.ipynb updated.${NC}"
+    fi
 fi
 
 # =============================================================================
