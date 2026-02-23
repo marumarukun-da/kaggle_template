@@ -4,7 +4,6 @@ import os
 import shutil
 import subprocess
 import tempfile
-from datetime import datetime
 from fnmatch import fnmatch
 from pathlib import Path
 
@@ -42,10 +41,11 @@ def existing_dataset() -> list:
 
 def check_if_exist_dataset(handle: str) -> bool:
     """Check if dataset already exist in kaggle."""
-    for ds in existing_dataset():
-        if str(ds) == handle:
-            return True
-    return False
+    try:
+        kaggle_client.dataset_status(handle)
+        return True
+    except Exception:
+        return False
 
 
 def existing_model() -> list:
@@ -265,18 +265,10 @@ def dataset_upload(
             json.dump(metadata, f, indent=4)
 
         if check_if_exist_dataset(handle=handle) and update:
-            # タイムスタンプファイルを追加して変更を強制
-            # Kaggle API は変更がないとバージョンを作成しないため
-            timestamp_file = dst_dir / ".upload_timestamp"
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            timestamp_file.write_text(timestamp)
-
-            version_notes = f"Updated at {timestamp}"
-            logger.info(f"update {handle} ({version_notes})")
-
+            print(f"[upload] Updating dataset: {handle}")
             kaggle_client.dataset_create_version(
                 folder=dst_dir,
-                version_notes=version_notes,
+                version_notes="update",
                 quiet=False,
                 convert_to_csv=False,
                 delete_old_versions=False,
@@ -284,7 +276,7 @@ def dataset_upload(
             )
             return
 
-        logger.info(f"create {handle}")
+        print(f"[upload] Creating new dataset: {handle}")
         kaggle_client.dataset_create_new(
             folder=dst_dir,
             public=False,
