@@ -62,14 +62,15 @@ if not IS_KAGGLE_ENV:
         f"{KAGGLE_USERNAME}/{KAGGLE_COMPETITION_NAME}-artifacts/other/{EXP_NAME}"
     )
     CODES_HANDLE = f"{KAGGLE_USERNAME}/{KAGGLE_COMPETITION_NAME}-codes"
+    COMP_DATASET_DIR = INPUT_DIR / KAGGLE_COMPETITION_NAME
 else:
     ROOT_DIR = Path("/kaggle/working")
     INPUT_DIR = Path("/kaggle/input")
-    ARTIFACT_DIR = INPUT_DIR / f"{KAGGLE_COMPETITION_NAME}-artifacts".lower() / "other"
+    KAGGLE_USERNAME = os.getenv("KAGGLE_USERNAME", "{{ cookiecutter.kaggle_username }}")
+    ARTIFACT_DIR = INPUT_DIR / "models" / KAGGLE_USERNAME / f"{KAGGLE_COMPETITION_NAME}-artifacts".lower() / "other"
     OUTPUT_DIR = ROOT_DIR  # Kaggle環境では /kaggle/working に出力
     VERSION = os.getenv("EXP_VERSION", "1")
-
-COMP_DATASET_DIR = INPUT_DIR / KAGGLE_COMPETITION_NAME
+    COMP_DATASET_DIR = INPUT_DIR / "competitions" / KAGGLE_COMPETITION_NAME
 
 for d in [INPUT_DIR, OUTPUT_DIR]:
     d.mkdir(exist_ok=True, parents=True)

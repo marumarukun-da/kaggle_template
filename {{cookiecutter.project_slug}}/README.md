@@ -258,10 +258,10 @@ sh scripts/push_deps.sh
 
 ```python
 # 実験 001 を提出する場合:
-!PYTHONPATH=/kaggle/input/{{ cookiecutter.competition_name }}-codes \
-  python /kaggle/input/{{ cookiecutter.competition_name }}-codes/experiments/001/inference.py
-#                                                                          ^^^
-#                                                         ここを提出したい実験番号に変更
+!PYTHONPATH=/kaggle/input/datasets/{{ cookiecutter.kaggle_username }}/{{ cookiecutter.competition_name }}-codes \
+  python /kaggle/input/datasets/{{ cookiecutter.kaggle_username }}/{{ cookiecutter.competition_name }}-codes/experiments/001/inference.py
+#                                                                                                          ^^^
+#                                                                                         ここを提出したい実験番号に変更
 ```
 
 **2. `sub/kernel-metadata.json` — `model_sources` の実験番号とバージョンを合わせる**
@@ -309,10 +309,10 @@ sh scripts/push_deps.sh
 ```
 kernel-metadata.json          →  Kaggle上のリソース
 ─────────────────────────────────────────────────────
-competition_sources           →  コンペデータ (/kaggle/input/{comp}/)
-dataset_sources (comp-codes)  →  実験コード (/kaggle/input/{comp}-codes/)
-kernel_sources (comp-deps)    →  依存パッケージ (/kaggle/input/{comp}-deps/)
-model_sources (comp-artifacts)→  学習済みモデル (/kaggle/input/{comp}-artifacts/)
+competition_sources           →  コンペデータ (/kaggle/input/competitions/{comp}/)
+dataset_sources (comp-codes)  →  実験コード (/kaggle/input/datasets/{user}/{comp}-codes/)
+kernel_sources (comp-deps)    →  依存パッケージ (/kaggle/input/{comp}-deps/) ※要確認
+model_sources (comp-artifacts)→  学習済みモデル (/kaggle/input/models/{user}/{comp}-artifacts/)
 ```
 
 </details>
