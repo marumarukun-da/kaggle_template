@@ -6,9 +6,7 @@
 
 - [ ] `.env.sample` をコピーして `.env` を作成
 - [ ] `.env` に `KAGGLE_USERNAME` と `KAGGLE_KEY` を設定
-- [ ] Docker コンテナを起動 (`docker compose up -d --build gpu` or `cpu`)
-- [ ] VSCode「コンテナーで再度開く」でコンテナに接続
-- [ ] 推奨拡張機能をインストール
+- [ ] 開発環境をセットアップ（**uv** または **Docker** を選択）
 - [ ] Kaggle上でコンペティションへの参加登録
 - [ ] `sh scripts/download_competition.sh` でデータをダウンロード
 
@@ -16,8 +14,7 @@
 
 ## Setup
 
-<details>
-<summary>1. 環境変数の設定</summary>
+### 1. 環境変数の設定
 
 `.env.sample`をコピーして`.env`を作成し、Kaggle認証情報を設定します：
 
@@ -36,10 +33,36 @@ KAGGLE_KEY=your_key           # あなたのKaggle API key
 > 2. 右上のアイコン → Settings → API → Create New Token
 > 3. ダウンロードされた `kaggle.json` から値をコピー
 
+### 2. 開発環境のセットアップ
+
+開発環境は **uv（ローカル）** と **Docker** の2つから選べます。
+
+<details>
+<summary>選択肢A: uv（軽量・高速）</summary>
+
+[uv](https://docs.astral.sh/uv/) がインストールされた環境であればすぐに始められます。
+レンタルGPU（BustAI 等）やローカルマシンで手軽に使いたい場合に適しています。
+
+```bash
+# 依存パッケージのインストール
+uv sync
+
+# 追加パッケージが必要な場合
+uv add polars lightgbm scikit-learn
+
+# 実行例
+uv run python experiments/001/train.py
+```
+
+> **Note**: Kaggle環境とパッケージバージョンが異なる場合があります。
+> 提出前に Kaggle 上で動作確認することをおすすめします。
+
 </details>
 
 <details>
-<summary>2. Docker環境の起動</summary>
+<summary>選択肢B: Docker（Kaggle環境を再現）</summary>
+
+Kaggle公式Dockerイメージを使用するため、Kaggle上と同一の環境で開発できます。
 
 GPU環境の場合：
 ```bash
@@ -51,16 +74,10 @@ CPU環境の場合：
 docker compose up -d --build cpu
 ```
 
-</details>
-
-<details>
-<summary>3. VSCode接続と拡張機能</summary>
-
+VSCodeで接続する場合：
 1. VSCodeの左下の「><」アイコンをクリック
 2. 「コンテナーで再度開く」を選択してコンテナに接続
-3. 推奨される拡張機能をインストール：
-   - 右下に表示される「推奨される拡張機能をインストール」の通知をクリック
-   - または、拡張機能タブ（Ctrl+Shift+X）から「推奨」セクションを確認
+3. 推奨される拡張機能をインストール
 
 </details>
 

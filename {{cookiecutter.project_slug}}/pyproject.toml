@@ -3,6 +3,10 @@ name = "{{ cookiecutter.project_slug }}"
 version = "0.1.0"
 description = "{{ cookiecutter.project_description }}"
 readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy",
+]
 
 [tool.ruff]
 exclude = [".git", ".mypy_cache", ".ruff_cache", ".venv", "third_party"]
