@@ -7,6 +7,7 @@
 - [ ] `.env.sample` をコピーして `.env` を作成
 - [ ] `.env` に `KAGGLE_USERNAME` と `KAGGLE_KEY` を設定
 - [ ] 開発環境をセットアップ（**uv** または **Docker** を選択）
+- [ ] `docs/` 配下のコンペ情報ドキュメントを整備
 - [ ] Kaggle上でコンペティションへの参加登録
 - [ ] `sh scripts/download_competition.sh` でデータをダウンロード
 
@@ -80,6 +81,23 @@ VSCodeで接続する場合：
 3. 推奨される拡張機能をインストール
 
 </details>
+
+---
+
+## コンペ情報の整理
+
+`docs/` 配下にコンペティションの情報をまとめるドキュメントがあります。
+各ファイルに記載されたAIプロンプトを使って情報を生成し、貼り付けてください。
+これらのドキュメントを整備しておくと、コーディングエージェント（Claude Code 等）に読み込ませることで、コンペの文脈を理解した上でのコード生成や実験設計の支援が受けられます。
+
+以下の順番で整備するのがおすすめです：
+
+| 順番 | ファイル | 内容 | 入力ソース |
+|------|---------|------|-----------|
+| 1 | `docs/competition_overview.md` | コンペの概要・ルール・制約 | Kaggle の Overview / Rules ページ |
+| 2 | `docs/dataset_description.md` | データセットの詳細 | Kaggle の Data ページ |
+| 3 | `docs/evaluation_metric.md` | 評価指標の解説 | 評価指標名 + overview の内容 |
+| 4 | `docs/domain_knowledge.md` | ドメイン知識・有効なアプローチ | overview の内容 |
 
 ---
 
